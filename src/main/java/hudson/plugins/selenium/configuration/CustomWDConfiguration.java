@@ -11,6 +11,7 @@ import hudson.plugins.selenium.configuration.browser.webdriver.FirefoxBrowser;
 import hudson.plugins.selenium.configuration.browser.webdriver.IEBrowser;
 import hudson.plugins.selenium.configuration.browser.webdriver.WebDriverBrowser;
 import hudson.plugins.selenium.configuration.browser.webdriver.WebDriverBrowser.WebDriverBrowserDescriptor;
+import hudson.remoting.VirtualChannel;
 import hudson.util.FormValidation;
 
 import java.io.IOException;
@@ -21,6 +22,7 @@ import javax.servlet.ServletException;
 
 import net.sf.json.JSONObject;
 
+import org.apache.commons.lang.math.NumberUtils;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
@@ -115,37 +117,75 @@ public class CustomWDConfiguration extends SeleniumNodeConfiguration {
         	return FormValidation.error("Must be an integer greater than or equal to -1.");
         }
 
-		
+        
+     }
+	protected static Object getMaxSession(final Computer c) throws IOException,	InterruptedException {
+		Object mxs = System.getProperty("webdriverMaxSession");
+		if (mxs == null) {
+			mxs = System.getenv("webdriverMaxSession");
+		}
+		if( c != null){
+			mxs = c.getEnvironment().get("webdriverMaxSession");
+			if (mxs == null) {
+				mxs = c.getSystemProperties().get("webdriverMaxSession");
+			}
+		}
+		return mxs;
 	}
+	
+	private int maxSession;
+	
+	@Exported
+	public int getMaxSession() {
+        return maxSession;
+    }
 
-	@Override
-	public SeleniumRunOptions initOptions(Computer c) {
+    //@Override
+	public SeleniumRunOptions initOptions(final Computer c) {
 		SeleniumRunOptions opt = new SeleniumRunOptions();
-        try {
-        
-        	int p = c.getChannel().call(new RetrieveAvailablePort(getPort()));
-        	if (p != -1) {
-        		opt.addOptionIfSet("-port", getPort());
-        	}
-        } catch (Exception e) {
-        	// an error occured, not adding the port option
-            //e.printStackTrace();
-        }
-        
-        if (getTimeout() != null && getTimeout() > -1) {
-	        opt.addOption("-timeout");
-	        opt.addOption(getTimeout().toString());
-        }
-        //addIfHasText(args, "-firefoxProfileTemplate", getRcFirefoxProfileTemplate());
-        for (AbstractSeleniumBrowser b : browsers) {
-        	b.initOptions(c, opt);
-        }
-        
-        if (display != null && !display.equals("")) {
-        	opt.setEnvVar("DISPLAY", display);
-        }        
-		
-        return opt;
+		int max = 20;
+		try {
+			final VirtualChannel channel = c == null  ? null : c.getChannel();
+			int p =channel == null  ? -1  :  channel.call(new RetrieveAvailablePort(getPort()));
+			if (p != -1) {
+				opt.addOptionIfSet("-port", getPort());
+			}
+			Object mxs =	getMaxSession(c);
+			if (mxs == null) {
+				mxs = this.maxSession;
+			}
+
+			if (mxs != null) {
+				System.out.println("webdriverMaxSession:" + mxs);
+				if (mxs instanceof Number) {
+					max = ((Number) mxs).intValue();
+				} else {
+					max = NumberUtils.toInt(mxs.toString());
+				}
+			}
+
+		} catch (Exception e) {
+			// an error occured, not adding the port option
+			// e.printStackTrace();
+			e.printStackTrace();
+		}
+		opt.addOptionIfSet("-maxSession", max > 0 ? max : 20);
+
+		if (getTimeout() != null && getTimeout() > -1) {
+			opt.addOption("-timeout");
+			opt.addOption(getTimeout().toString());
+		}
+		// addIfHasText(args, "-firefoxProfileTemplate",
+		// getRcFirefoxProfileTemplate());
+		for (AbstractSeleniumBrowser b : browsers) {
+			b.initOptions(c, opt);
+		}
+
+		if (display != null && !display.equals("")) {
+			opt.setEnvVar("DISPLAY", display);
+		}
+
+		return opt;
 	}
 
 	public String getIcon() {
