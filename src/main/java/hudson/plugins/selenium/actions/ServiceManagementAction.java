@@ -26,8 +26,14 @@ import javax.servlet.ServletException;
 import org.kohsuke.stapler.HttpResponse;
 import org.kohsuke.stapler.HttpResponses;
 import org.kohsuke.stapler.QueryParameter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ServiceManagementAction implements Action {
+    /**
+     * Logger for this class
+     */
+    private static final Logger LOG = LoggerFactory.getLogger(ServiceManagementAction.class);
 
 	private Computer computer;
 	
@@ -48,12 +54,14 @@ public class ServiceManagementAction implements Action {
     }
     
 	public HttpResponse doRestart(@QueryParameter String conf) throws IOException, ServletException {
+	    LOG.info("doRestart {} ...",conf);
 		doStop(conf);
 		doStart(conf);
         return HttpResponses.forwardToPreviousPage();
     }
 	
 	public HttpResponse doStop(@QueryParameter String conf) throws IOException, ServletException {
+	    LOG.info("doStop {} ...",conf);
 		VirtualChannel slaveChannel = PluginImpl.getChannel(computer);
 		if (slaveChannel != null) {
 			try {
@@ -63,11 +71,11 @@ public class ServiceManagementAction implements Action {
 				slaveChannel.call(new SetRemoteRunningCallable(conf, false));
                 slaveChannel.call(new CloseSeleniumChannelCallable(conf));
 			} catch (Exception e) {
-				e.printStackTrace();
+			    LOG.error("{}",e,e);
 				try {
 					slaveChannel.call(new RunningRemoteSetterCallable(conf, SeleniumConstants.ERROR));
 				} catch (Exception e1) {
-					e1.printStackTrace();
+				    LOG.error("{}",e1,e1);
 				}
 			}
 		}
@@ -76,9 +84,11 @@ public class ServiceManagementAction implements Action {
 	
 	public HttpResponse doStart(@QueryParameter String conf) throws IOException, ServletException {
 		try {
+		    LOG.info("doStart {} ...",conf);
+		    System.out.println("selenium plugin doSart...");
 			PluginImpl.startSeleniumNode(computer, new StreamTaskListener(new OutputStreamWriter(System.out)), conf);
 		} catch (Exception e) {
-            e.printStackTrace();
+		    LOG.error("{}",e,e);
 		}
 		return HttpResponses.forwardToPreviousPage();
 	}
