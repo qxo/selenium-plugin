@@ -525,7 +525,7 @@ public class PluginImpl extends Plugin implements Action, Serializable,
             autoStartSeleniumNode = c.getEnvironment().get("autoStartSeleniumNode");
         }
         listener.getLogger().println("autoStartSeleniumNode: " + autoStartSeleniumNode);
-        if("false".equals(autoStartSeleniumNode)){
+        if("false".equals(autoStartSeleniumNode )&& conf == null){
             listener.getLogger().println("autoStartSeleniumNode = false skipping auto starting Selenium Grid nodes on " + c.getName());
             return ;            
         }
