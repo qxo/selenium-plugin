@@ -3,13 +3,13 @@ package hudson.plugins.selenium.actions;
 import hudson.model.Action;
 import hudson.model.Computer;
 import hudson.plugins.selenium.PluginImpl;
+import hudson.plugins.selenium.callables.CreateStreamTaskListenerCallable;
 import hudson.plugins.selenium.callables.GetConfigurations;
 import hudson.plugins.selenium.configuration.global.SeleniumGlobalConfiguration;
 import hudson.plugins.selenium.process.SeleniumRunOptions;
 import hudson.util.StreamTaskListener;
 
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +53,10 @@ public class ServiceManagementAction implements Action {
 
     public HttpResponse doStart(@QueryParameter String conf) throws IOException, ServletException {
         try {
-            PluginImpl.startSeleniumNode(computer, new StreamTaskListener(new OutputStreamWriter(System.out)), conf);
+            final CreateStreamTaskListenerCallable callable = new CreateStreamTaskListenerCallable();
+            final StreamTaskListener stdout = computer.getNode().getRootPath().act(callable); //StreamTaskListener.fromStdout();//callable.call();
+            stdout.getLogger().println("doStart :"+computer.getName());
+            PluginImpl.startSeleniumNode(computer, stdout, conf);
         } catch (Exception e) {
             e.printStackTrace();
         }

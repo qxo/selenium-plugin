@@ -18,6 +18,7 @@
 package hudson.plugins.selenium;
 
 import hudson.DescriptorExtensionList;
+import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Plugin;
 import hudson.console.HyperlinkNote;
@@ -52,6 +53,9 @@ import hudson.remoting.Channel;
 import hudson.security.Permission;
 import hudson.security.PermissionGroup;
 import hudson.security.PermissionScope;
+import hudson.slaves.NodeProperty;
+import hudson.slaves.NodePropertyDescriptor;
+import hudson.util.DescribableList;
 import hudson.util.IOException2;
 import hudson.util.StreamTaskListener;
 
@@ -118,6 +122,11 @@ public class PluginImpl extends Plugin implements Action, Serializable, Describa
     private int port = 4444;
 
     /**
+     * auto start selenium node with jenkins slave
+     */
+    private boolean autoStartSeleniumNode = true ;
+
+    /**
      * Exclusion pattern for nodes. Nodes matching this pattern will not have a selenium node running on them.
      */
     private String exclusionPatterns;
@@ -173,7 +182,7 @@ public class PluginImpl extends Plugin implements Action, Serializable, Describa
         timeout = formData.optInt("timeout", 300000);
         browserTimeout = formData.optInt("browserTimeout", 0);
         throwOnCapabilityNotPresent = formData.getBoolean("throwOnCapabilityNotPresent");
-
+        autoStartSeleniumNode = formData.getBoolean("autoStartSeleniumNode");
         hostnameResolver = req.bindJSON(HostnameResolver.class, formData.optJSONObject("hostnameResolver"));
         if (hostnameResolver == null)
             hostnameResolver = new JenkinsRootHostnameResolver();
@@ -243,6 +252,11 @@ public class PluginImpl extends Plugin implements Action, Serializable, Describa
     @Exported
     public int getPort() {
         return port;
+    }
+    
+    @Exported
+    public boolean getAutoStartSeleniumNode() {
+        return autoStartSeleniumNode;
     }
 
     @Exported
@@ -475,7 +489,7 @@ public class PluginImpl extends Plugin implements Action, Serializable, Describa
                 }
             }
         }
-
+        
         final String masterName = PluginImpl.getMasterHostName();
         if (masterName == null) {
             listener.getLogger().println(
@@ -483,6 +497,20 @@ public class PluginImpl extends Plugin implements Action, Serializable, Describa
                             + HyperlinkNote.encodeTo("/configure", "configure the Jenkins URL") + " from the system configuration screen.");
             return;
         }
+        
+        EnvVars envVars = getNodeVars(c);
+        listener.getLogger().println("node envVars: " + envVars);
+        
+        String autoStartSeleniumNode = envVars != null ? envVars.get("autoStartSeleniumNode"): null;
+        if(autoStartSeleniumNode == null ) {
+            autoStartSeleniumNode = Boolean.toString(p.getAutoStartSeleniumNode());
+        }
+        listener.getLogger().println("autoStartSeleniumNode: " + autoStartSeleniumNode);
+        if("false".equals(autoStartSeleniumNode )&& conf == null){
+            listener.getLogger().println("autoStartSeleniumNode = false for  skipping auto starting Selenium Grid nodes on " + c.getName());
+            return ;            
+        }
+        
 
         // make sure that Selenium Hub is started before we start RCs.
         try {
@@ -509,6 +537,23 @@ public class PluginImpl extends Plugin implements Action, Serializable, Describa
                 }
             }
         }
+    }
+
+    /**
+     * 
+     * @param c - Computer
+     * @return "Node Properties" --> "Environment variables"
+     */
+    public static EnvVars getNodeVars(Computer c) {
+        EnvVars envVars  =null;
+        final DescribableList<NodeProperty<?>, NodePropertyDescriptor> nodeProperties = c.getNode().getNodeProperties();
+        for(Map.Entry<NodePropertyDescriptor,NodeProperty<?>> entry:nodeProperties.toMap().entrySet()) {
+            if(entry.getValue() instanceof hudson.slaves.EnvironmentVariablesNodeProperty ) {
+                envVars = ((hudson.slaves.EnvironmentVariablesNodeProperty )entry.getValue()).getEnvVars();
+                break;
+            }
+        }
+        return envVars;
     }
 
     public static PluginImpl getPlugin() {

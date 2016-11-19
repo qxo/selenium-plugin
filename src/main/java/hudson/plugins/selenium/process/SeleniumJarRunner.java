@@ -3,6 +3,7 @@
  */
 package hudson.plugins.selenium.process;
 
+import hudson.EnvVars;
 import hudson.FilePath;
 import hudson.model.TaskListener;
 import hudson.model.Computer;
@@ -32,20 +33,24 @@ public abstract class SeleniumJarRunner implements SeleniumProcess {
     public abstract SeleniumRunOptions initOptions(Computer c);
 
     public void start(Computer computer, TaskListener listener, String name) throws IOException, InterruptedException, ExecutionException {
-        PluginImpl p = PluginImpl.getPlugin();
-
         final FilePath seleniumJar = new FilePath(SeleniumProcessUtils.findStandAloneServerJar());
         final String nodeName = computer.getName();
-        final String masterName = PluginImpl.getMasterHostName();
-
-        String nodehost = computer.getHostName();
-
         SeleniumRunOptions opts = initOptions(computer);
 
         if (opts != null) {
-            opts.addOptionIfSet("-host", nodehost);
+            final String masterName = PluginImpl.getMasterHostName();
+            final PluginImpl p = PluginImpl.getPlugin();
+            final EnvVars nodeVars = PluginImpl.getNodeVars(computer);
+            String nodehost = nodeVars != null ? nodeVars.get("seleniumNodeIp") : null;
+//            if( null == nodehost) {
+//                //nodehost = computer.getHostName();
+//            }
+            listener.getLogger().println("host:"+computer.getHostName());
+            if( null != nodehost) {
+                opts.addOptionIfSet("-host", nodehost);
+            }
             computer.getNode().getRootPath()
-                    .act(new SeleniumCallable(seleniumJar, nodehost, masterName, p.getPort(), nodeName, listener, name, opts));
+                    .act(new SeleniumCallable(seleniumJar,masterName, p.getPort(), nodeName, listener, name, opts));
         }
     }
 

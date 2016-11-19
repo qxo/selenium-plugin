@@ -20,6 +20,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import jenkins.MasterToSlaveFileCallable;
+import jenkins.model.Jenkins;
+import jenkins.security.MasterToSlaveCallable;
 
 import org.apache.commons.lang.ArrayUtils;
 
@@ -42,7 +44,7 @@ public class SeleniumCallable extends MasterToSlaveFileCallable<String> {
 
     private String[] defaultArgs;
 
-    public SeleniumCallable(FilePath jar, String nodehost, String masterName, int masterPort, String nodeName, TaskListener listener,
+    public SeleniumCallable(FilePath jar, String masterName, int masterPort, String nodeName, TaskListener listener,
             String confName, SeleniumRunOptions options) throws InterruptedException, IOException {
         seleniumJar = jar;
         jarTimestamp = jar.lastModified();
@@ -69,7 +71,8 @@ public class SeleniumCallable extends MasterToSlaveFileCallable<String> {
         }
 
         // listener.getLogger().println("Copy grid jar");
-        File localJar = new File(f, seleniumJar.getName());
+      //using same file name so when we can upgrade selenium version with stay old version on slave
+        final File localJar = new File(f, "selenium-server-standalone.jar");
         if (localJar.lastModified() != jarTimestamp) {
             try {
                 seleniumJar.copyTo(new FilePath(localJar));
@@ -82,6 +85,7 @@ public class SeleniumCallable extends MasterToSlaveFileCallable<String> {
         try {
 
             listener.getLogger().println("Creating selenium node VM");
+
             Channel jvm = SeleniumProcessUtils.createSeleniumRCVM(localJar, listener, options.getJVMArguments(), options.getEnvironmentVariables());
             status = new RemoteRunningStatus(jvm, options);
             status.setStatus(SeleniumConstants.STARTING);
@@ -97,6 +101,8 @@ public class SeleniumCallable extends MasterToSlaveFileCallable<String> {
             jvm.callAsync(new RemoteControlLauncher(nodeName, (String[])allArgs));
             status.setStatus(SeleniumConstants.STARTED);
             status.setRunning(true);
+
+            
         } catch (Exception t) {
             status.setRunning(false);
             status.setStatus(SeleniumConstants.ERROR);
